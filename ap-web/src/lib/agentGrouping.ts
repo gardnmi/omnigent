@@ -19,6 +19,7 @@ export const BUILTIN_AGENTS = new Set([
   "cursor-native-ui", // Cursor
   "kiro-native-ui", // Kiro
   "goose-native-ui", // Goose
+  "qwen-native-ui", // Qwen Code
   "polly",
   "debby",
 ]);
@@ -34,6 +35,7 @@ export const AGENT_DISPLAY_ORDER = [
   "Cursor",
   "Pi",
   "Kiro",
+  "Qwen Code",
   "Polly",
   "Debby",
 ];
