@@ -240,12 +240,12 @@ def test_launched_kiro_terminal_without_metadata_has_no_tmux() -> None:
 def test_tmux_attach_env_filters_to_allowlist(monkeypatch: pytest.MonkeyPatch) -> None:
     """Only allowlisted, set environment keys reach the tmux attach process."""
     monkeypatch.setenv("TERM", "xterm-256color")
-    monkeypatch.setenv("OMNIGENT_SECRET", "leak")
+    monkeypatch.setenv("OMNIGENT_UNLISTED_VAR", "present")
 
     env = _tmux_attach_env()
 
     assert env["TERM"] == "xterm-256color"
-    assert "OMNIGENT_SECRET" not in env
+    assert "OMNIGENT_UNLISTED_VAR" not in env
 
 
 def test_direct_tmux_unavailable_reason_reports_each_gap(
