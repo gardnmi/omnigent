@@ -31,6 +31,7 @@ export type ConversationIconKind =
   | "goose"
   | "antigravity"
   | "qwen"
+  | "hermes"
   | "nessie"
   | null;
 

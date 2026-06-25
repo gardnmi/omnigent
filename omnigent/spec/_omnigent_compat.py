@@ -92,6 +92,7 @@ OMNIGENT_HARNESSES = frozenset(
         "goose",
         "goose-native",
         "hermes",
+        "hermes-native",
         "openai-agents",
         "open-responses",
         "opencode-native",
@@ -115,6 +116,7 @@ OMNIGENT_HARNESS_ALIASES = frozenset(
         "qwen-code",
         "opencode",
         "native-opencode",
+        "native-hermes",
         "github-copilot",
     }
 )
