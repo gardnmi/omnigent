@@ -211,14 +211,20 @@ async def supervise_kiro_permission_mirror(
                 events, offset = await asyncio.to_thread(
                     _read_new_permission_events, record_file, offset
                 )
+                # Reap finished delivery tasks so a completed or failed web verdict
+                # frees the single-prompt slot. Without this, a keystroke-delivery
+                # failure would leave the slot occupied forever and silently block
+                # every later prompt from the web mirror. A late matching response
+                # event then finds no pending entry and is safely ignored.
+                for done_id in [rid for rid, entry in pending.items() if entry.task.done()]:
+                    pending.pop(done_id, None)
                 resolved_in_batch = {
                     event.request_id for event in events if event.kind == "response"
                 }
                 for event in events:
                     if event.kind == "request":
                         if (
-                            event.request_id in pending
-                            or pending
+                            pending
                             or event.permission is None
                             or event.request_id in resolved_in_batch
                         ):

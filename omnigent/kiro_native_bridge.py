@@ -569,6 +569,13 @@ def send_kiro_permission_verdict(
     )
     if action == "accept":
         time.sleep(_PERMISSION_ENTER_SETTLE_S)
+        pane = _capture_pane(socket_path, tmux_target)
+        if not (
+            _kiro_permission_prompt_active(pane)
+            and _kiro_permission_focus_on_one_time_allow(pane)
+            and _kiro_permission_prompt_matches_title(pane, expected_title)
+        ):
+            raise RuntimeError("kiro-native allow option was not safely focused before delivery")
         _run_tmux(socket_path, "send-keys", "-t", tmux_target, "Enter")
         time.sleep(_PERMISSION_KEY_INTERVAL_S)
         return

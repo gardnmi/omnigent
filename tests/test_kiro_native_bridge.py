@@ -132,6 +132,34 @@ def test_send_kiro_permission_verdict_accepts_default_option(
     assert sent_keys == ["Enter"]
 
 
+def test_send_kiro_permission_verdict_refuses_accept_when_focus_drifts_after_settle(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Accept re-validates the allow row after the settle delay before Enter."""
+    monkeypatch.setattr(bridge, "_POLL_INTERVAL_S", 0.0)
+    monkeypatch.setattr(bridge, "_PERMISSION_KEY_INTERVAL_S", 0.0)
+    monkeypatch.setattr(bridge, "_PERMISSION_ENTER_SETTLE_S", 0.0)
+    bridge_dir = tmp_path / "bridge"
+    calls = _install_fake_tmux(
+        monkeypatch,
+        pane_outputs=[_PERMISSION_PANE, _PERMISSION_PANE_TRUST_FOCUSED],
+    )
+    write_tmux_target(
+        bridge_dir,
+        socket_path=Path("/tmp/tmux.sock"),
+        tmux_target="main",
+    )
+
+    with pytest.raises(RuntimeError, match="allow option was not safely focused"):
+        send_kiro_permission_verdict(
+            bridge_dir, action="accept", expected_title="Running: pwd", timeout_s=0.1
+        )
+
+    sent_keys = [call[-1] for call in calls if "send-keys" in call]
+    assert sent_keys == []
+
+
 def test_send_kiro_permission_verdict_declines_with_slow_navigation(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

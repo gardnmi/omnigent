@@ -418,3 +418,73 @@ async def test_supervise_mirror_skips_additional_request_while_one_is_pending(
         task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await task
+
+
+@pytest.mark.asyncio
+async def test_supervise_mirror_reaps_finished_task_and_mirrors_next_request(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """A finished delivery task frees the slot so a later prompt is still mirrored.
+
+    Without reaping done tasks, a completed (or failed) web-delivery would keep
+    the single-prompt slot occupied forever and silently block every later
+    prompt from the web mirror.
+    """
+
+    class _FakeAsyncClient:
+        def __init__(self, **_kw: object) -> None:
+            pass
+
+        async def __aenter__(self) -> _FakeAsyncClient:
+            return self
+
+        async def __aexit__(self, *_args: object) -> bool:
+            return False
+
+        async def post(self, url: str, *, json: dict, **_kw: object) -> httpx.Response:
+            return httpx.Response(200, request=httpx.Request("POST", url))
+
+    monkeypatch.setattr(knp.httpx, "AsyncClient", _FakeAsyncClient)
+    run_one_calls: list[str] = []
+
+    async def _fake_run_one(_client: object, *, permission: object, **_kw: object) -> None:
+        # Returns immediately, so the parked task finishes without a recorder
+        # response event ever arriving (mimics a delivered/failed verdict).
+        run_one_calls.append(permission.request_id)  # type: ignore[attr-defined]
+
+    monkeypatch.setattr(knp, "_run_one_permission", _fake_run_one)
+    record_file = acp_record_path(tmp_path)
+    record_file.write_bytes(b"")
+
+    task = asyncio.create_task(
+        knp.supervise_kiro_permission_mirror(
+            base_url="http://t",
+            headers={},
+            session_id="conv_6",
+            bridge_dir=tmp_path,
+            poll_interval_s=0.001,
+        )
+    )
+    try:
+        await asyncio.sleep(0.05)
+        with record_file.open("ab") as handle:
+            handle.write(_record_bytes(_permission_msg("req-1")))
+        for _ in range(400):
+            if run_one_calls == ["req-1"]:
+                break
+            await asyncio.sleep(0.005)
+        assert run_one_calls == ["req-1"]
+        # No response event for req-1 ever arrives; the reaper must still free
+        # the slot once its task is done so req-2 gets mirrored.
+        with record_file.open("ab") as handle:
+            handle.write(_record_bytes(_permission_msg("req-2")))
+        for _ in range(400):
+            if run_one_calls == ["req-1", "req-2"]:
+                break
+            await asyncio.sleep(0.005)
+        assert run_one_calls == ["req-1", "req-2"]
+    finally:
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task

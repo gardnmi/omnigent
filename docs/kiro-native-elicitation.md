@@ -58,7 +58,7 @@ Kiro's public docs describe `KIRO_ACP_RECORD_PATH` as a traffic recorder, not as
 
 The render gaps are required. A live probe showed that sending `Down Down Enter` as one burst could still select the default approval because the TUI had not processed the intermediate selection movement.
 
-Before typing, the bridge verifies that Kiro's approval prompt is visible, focused on the one-time allow row, and associated with the parsed request title. For reject/cancel, it moves one row at a time and verifies the one-time reject row is focused before pressing `Enter`. If those checks fail, delivery fails open and the Terminal remains usable.
+Immediately before pressing `Enter`, the bridge re-verifies that Kiro's approval prompt is visible, focused on the intended row, and associated with the parsed request title — the one-time allow row for `accept` (re-checked after the pre-`Enter` settle delay), or the one-time reject row for `decline` / `cancel` after moving down one row at a time. If those checks fail, the bridge raises instead of typing, so no verdict is delivered and the Terminal remains usable.
 
 ## Race Handling
 
@@ -67,8 +67,9 @@ The mirror starts at the current end of the recorder file. Historical recorder e
 For new records:
 
 - A request followed by its response in the same poll batch is skipped, because the prompt already resolved before a web card could safely park.
-- A response for a still-parked request posts `external_elicitation_resolved`, clears the web card when the Terminal wins, and cancels the parked web-delivery task so a late web verdict cannot apply to a later same-titled prompt.
+- A response for a still-parked request posts `external_elicitation_resolved`, clears the web card when the Terminal wins, and cancels the parked web-delivery task. Cancelling reliably aborts a verdict still waiting on the web user. If a web verdict is already mid-delivery through tmux, the keystroke worker cannot be interrupted, so the per-keypress focus and title re-validation (above) is what stops it: a verdict whose prompt has changed or vanished fails closed rather than landing on a later prompt.
 - A web verdict delivered through tmux is treated as a delivery attempt; Kiro's matching ACP result remains the internal confirmation that the prompt resolved.
+- Once a prompt is parked, the mirror handles one approval at a time; any further Kiro prompt that arrives while it is pending stays Terminal-only (the authoritative fallback) rather than queuing a second card.
 
 ## Security Notes
 
